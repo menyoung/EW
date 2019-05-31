@@ -20,19 +20,21 @@ end
 stamp = Dates.DateFormat("yymmdd_HHMMSS.c\\sv")
 
 function arb(period, volts)
-    println("Set up video camera trigger and press Enter")
+    wt = 1.01*period*(2+length(volts))./80e6
+    println("$(period/80) us = $(80e6 / period) Hz will take $wt seconds")
+    println("Set up video camera trigger then press Enter")
     readline()
     ct = NIDAQ.generate_pulses("$dev/ctr1", high = 240, low = period - 240)
     NIDAQ.CfgImplicitTiming(ct.th, NIDAQ.Val_FiniteSamps , length(volts))
     ao = NIDAQ.analog_output("$dev/ao0", range=[minimum(volts),maximum(volts)])
     NIDAQ.CfgSampClkTiming(ao.th, pointer("Ctr1InternalOutput"), 4000, NIDAQ.Val_Rising, NIDAQ.Val_FiniteSamps, length(volts))
     NIDAQ.write(ao, volts)
-    ai = NIDAQ.analog_input("$dev/ai0:2")
+    ai = NIDAQ.analog_input("$dev/ai0:3")
     NIDAQ.CfgSampClkTiming(ai.th, pointer("Ctr1InternalOutput"), 4000, NIDAQ.Val_Rising, NIDAQ.Val_FiniteSamps, length(volts))
     NIDAQ.start(ai); NIDAQ.start(ao); NIDAQ.start(ct)
-    sleep(1.01*period*(2+length(volts))./80e6) # clock is 80MHz
+    sleep(wt) # clock is 80MHz
     Vi = NIDAQ.read(ai, Float64, length(volts))
-    df = DataFrames.DataFrame(Vo = volts, V1 = Vi[:,1], Vx = Vi[:,2], Vy = Vi[:,3])
+    df = DataFrames.DataFrame(Vo = volts, I = Vi[:,1] ./ 1e5, V1 = Vi[:,1], Vx = Vi[:,2], Vy = Vi[:,3], V4 = Vi[:,4])
     fn = Dates.format(Dates.now(),stamp)
     CSV.write(fn, df)
     NIDAQ.clear(ai); NIDAQ.clear(ao); NIDAQ.clear(ct)

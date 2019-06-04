@@ -25,8 +25,10 @@ function arb(period, volts)
     gI = try parse(Float64, readline()) catch; 1e5 end
     println("What is Lock-in analog gain (1e2)? [offset sould be zero!]")
     gV = try parse(Float64, readline()) catch; 1e2 end
-    println("$dev/ctr1 Set up video camera trigger then press Enter to start (N to exit)")
-    user_input = readline()
+    println("$dev/ctr1 Set up video camera trigger then give this experiment a name (Enter to abort)")
+    name = readline()
+    if isempty(name) | all(isspace, name) return end
+    fn = Dates.format(Dates.now(),stamp) * "_$name.csv"
     if startswith(user_input,"N") | startswith(user_input,"n")
         println("abort!"); return
     end
@@ -41,7 +43,7 @@ function arb(period, volts)
     sleep(wt)
     Vi = NIDAQ.read(ai, Float64, length(volts))
     df = DataFrames.DataFrame(V = volts, I = Vi[:,1] ./ gI, V1 = Vi[:,1], Vx = Vi[:,2] ./ gV, Vy = Vi[:,3] ./ gV, V4 = Vi[:,4])
-    fn = Dates.format(Dates.now(),stamp) * ".csv"
+
     CSV.write(fn, df)
     NIDAQ.clear(ai); NIDAQ.clear(ao); NIDAQ.clear(ct)
     fn
@@ -51,7 +53,7 @@ sweeps(Va, Vc, step, n=1) = [0:-step:Va+step;repeat([Va:step:Vc-step;Vc:-step:Va
 
 # repeat(volts, inner=n) repeats each number n times then go to next
 
-# python code to create a random Euler circuit
+# python code using NetworkX to create a random Euler circuit
 py"""
 import networkx as nx
 import random
@@ -81,5 +83,12 @@ def euler_random(n):
     g = nx.complete_graph(n, nx.DiGraph())
     return [u for u, v in simplegraph_eulerian_circuit(g, next(iter(g)))]
 """
+# Julia interface adds the return to 0 vertex
+euler_random(n) = [py"euler_random"(n);0]
+
+function euler_volts(Va, Vc, step)
+    vlist = [0;step:step:Vc;-step:-step:Va]
+    map(x -> vlist[x+1], euler_random(length(vlist)))
+end
 
 #end

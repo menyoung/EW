@@ -29,9 +29,6 @@ function arb(period, volts)
     name = readline()
     if isempty(name) | all(isspace, name) return end
     fn = Dates.format(Dates.now(),stamp) * "_$name.csv"
-    if startswith(user_input,"N") | startswith(user_input,"n")
-        println("abort!"); return
-    end
     ct = NIDAQ.generate_pulses("$dev/ctr1", high = 240, low = period - 240)
     NIDAQ.CfgImplicitTiming(ct.th, NIDAQ.Val_FiniteSamps , length(volts))
     ao = NIDAQ.analog_output("$dev/ao0", range=[minimum(volts),maximum(volts)])
